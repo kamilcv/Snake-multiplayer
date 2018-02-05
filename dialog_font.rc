@@ -1,0 +1,12 @@
+#include <windows.h>
+#include "dialog_font.h"
+
+IDD_MOJDIALOG DIALOG DISCARDABLE 20, 20, 200, 66
+STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Mój w³asny dialog"
+FONT 8, "MS Sans Serif"
+{
+    DEFPUSHBUTTON "&Fajnie!", IDOK, 124, 18, 50, 14
+    PUSHBUTTON "&Anuluj", IDCANCEL, 124, 35, 50, 14
+    LTEXT "To jest okno dialogowe", IDC_LABEL, 16, 18, 80, 33
+}

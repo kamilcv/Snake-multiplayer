@@ -1,0 +1,16 @@
+Moje_menu MENU
+{
+    POPUP "&Plik"
+    {
+        MENUITEM "&Zakoncz", 100
+    }
+    POPUP "&Widok"
+    {
+        MENUITEM "&Czcionka", 101
+        POPUP "&Kolor"
+        {
+            MENUITEM "&Tla animacji", 102
+            MENUITEM "W&ykresu", 103
+        }
+    }
+}

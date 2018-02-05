@@ -1,0 +1,539 @@
+#if defined(UNICODE) && !defined(_UNICODE)
+    #define _UNICODE
+#elif defined(_UNICODE) && !defined(UNICODE)
+    #define UNICODE
+#endif
+
+#include <tchar.h>
+#include <windows.h>
+#include <time.h>
+#include <iostream>
+#include <cmath>
+#include <SFML/Graphics.hpp>
+#include <SFML/System.hpp>
+#include <sstream>
+
+using namespace std;
+
+HWND hwnd;               /* This is the handle for our window */
+
+/*  Declare Windows procedure  */
+LRESULT CALLBACK WindowProcedure (HWND, UINT, WPARAM, LPARAM);
+
+/*  Make the class name into a global variable  */
+TCHAR szClassName[ ] = _T("CodeBlocksWindowsApp");
+bool banimacja = false;
+
+HWND przycik_rysowania, przycisk_stop, przycisk_wyjscie;
+HWND static_czas_ruchu, static_predkosc_poczatkowa, static_predkosc_koncowa, static_promien_okregu;
+HWND edit_czas_ruchu, edit_predkosc_poczatkowa, edit_predkosc_koncowa, edit_promien_okregu;
+
+float x;
+float y;
+
+float czas_ruchu = -1;
+
+float predkosc_poczatkowa = -1;
+float predkos_koncowa = -1;
+float przyspieszenie;
+float predkosc;
+
+float droga;
+float promien_okregu = -1;
+float predkosc_obiektu;
+float przyspieszenie_obiektu;
+
+sf::RenderWindow okno;
+
+HDC hdcokno;
+HPEN czarne_pioro, czerwone_pioro, pudelko;
+POINT stary;
+
+sf::Clock zegar;
+
+float wykres1_x;
+float wykres1_y;
+
+
+void func()
+{
+    if( promien_okregu * 2 + 100 < 400 )
+        okno.create( sf::VideoMode( 400, 400 ), "okno SFML", sf::Style::None );
+    else
+        okno.create( sf::VideoMode( promien_okregu * 2 + 100, promien_okregu * 2 + 100 ), "okno SFML", sf::Style::None );
+
+    sf::Image image;
+    image.loadFromFile( "buzka.png" );
+    image.createMaskFromColor( sf::Color( 255, 255, 255 ), 0 );
+    sf::Texture tekstura;
+    tekstura.loadFromImage( image );
+    sf::Sprite buzka;
+    buzka.setTexture( tekstura );
+
+    buzka.setOrigin( 25, 25 );
+
+    sf::Font font;
+    font.loadFromFile( "arial.ttf" );
+
+    string wylaczenie = "Aby wylaczyc animacje wcisnij Stop";
+
+    sf::Event event;
+    zegar.restart();
+
+    ostringstream odane;
+    string sdane;
+    sf::Text tekst;
+
+    while( okno.isOpen() )
+    {
+        while( okno.pollEvent( event ) )
+        {
+            if( event.type == sf::Event::Closed )
+                okno.close();
+
+        }
+        okno.clear( sf::Color::Red );
+
+        tekst.setString( wylaczenie );
+        tekst.setFont( font );
+        tekst.setCharacterSize( 20 );
+        tekst.setColor( sf::Color::Black );
+        tekst.setPosition( 0, 0 );
+        okno.draw( tekst );
+
+        odane.str( "" );
+        odane << "Aktualna predkosc: " << predkosc;
+        sdane = odane.str();
+        tekst.setString( sdane );
+        tekst.setFont( font );
+        tekst.setCharacterSize( 12 );
+        tekst.setColor( sf::Color::Black );
+        tekst.setPosition( 10, okno.getSize().y - 100 );
+        okno.draw( tekst );
+
+        odane.str( "" );
+        odane << "Czas: " << zegar.getElapsedTime().asSeconds() << "s";
+        sdane = odane.str();
+        tekst.setString( sdane );
+        tekst.setFont( font );
+        tekst.setCharacterSize( 12 );
+        tekst.setColor( sf::Color::Black );
+        tekst.setPosition( 10, okno.getSize().y - 80 );
+        okno.draw( tekst );
+
+        odane.str( "" );
+        odane << "Predkosc poczatkowa: " << predkosc_poczatkowa;
+        sdane = odane.str();
+        tekst.setString( sdane );
+        tekst.setFont( font );
+        tekst.setCharacterSize( 12 );
+        tekst.setColor( sf::Color::Black );
+        tekst.setPosition( 10, okno.getSize().y - 60 );
+        okno.draw( tekst );
+
+        odane.str( "" );
+        odane << "Predkosc koncowa: " << predkos_koncowa;
+        sdane = odane.str();
+        tekst.setString( sdane );
+        tekst.setFont( font );
+        tekst.setCharacterSize( 12 );
+        tekst.setColor( sf::Color::Black );
+        tekst.setPosition( 10, okno.getSize().y - 40 );
+        okno.draw( tekst );
+
+        odane.str( "" );
+        odane << "Promien okregu: " << promien_okregu;
+        sdane = odane.str();
+        tekst.setString( sdane );
+        tekst.setFont( font );
+        tekst.setCharacterSize( 12 );
+        tekst.setColor( sf::Color::Black );
+        tekst.setPosition( 10, okno.getSize().y - 20 );
+        okno.draw( tekst );
+
+
+        predkosc = predkosc_poczatkowa + przyspieszenie * zegar.getElapsedTime().asSeconds();
+
+        x = promien_okregu*cos( predkosc * zegar.getElapsedTime().asSeconds()) + okno.getSize().x / 2;
+        y = promien_okregu*sin( predkosc * zegar.getElapsedTime().asSeconds() ) + okno.getSize().y / 2;
+
+        buzka.setPosition( x, y );
+        okno.draw( buzka );
+
+        if( predkosc <= 13 && zegar.getElapsedTime().asSeconds() <= 13 )
+        {
+            SendMessage( hwnd, WM_COMMAND, 5, 0 );
+            wykres1_x = zegar.getElapsedTime().asSeconds();
+            wykres1_y = predkosc;
+        }
+
+        okno.display();
+    }
+}
+
+sf::Thread theard( &func );
+
+int GetIntFromEdit(HWND hEdit)
+{
+   int textLength = GetWindowTextLength(hEdit) + 1;
+
+   char *textBuffer = new char[textLength];
+
+   GetWindowText(hEdit, textBuffer, textLength );
+
+   return atoi(textBuffer);
+}
+
+int WINAPI WinMain (HINSTANCE hThisInstance,
+                     HINSTANCE hPrevInstance,
+                     LPSTR lpszArgument,
+                     int nCmdShow)
+{
+    MSG messages;            /* Here messages to the application are saved */
+    WNDCLASSEX wincl;        /* Data structure for the windowclass */
+
+    /* The Window structure */
+    wincl.hInstance = hThisInstance;
+    wincl.lpszClassName = szClassName;
+    wincl.lpfnWndProc = WindowProcedure;      /* This function is called by windows */
+    wincl.style = CS_DBLCLKS;                 /* Catch double-clicks */
+    wincl.cbSize = sizeof (WNDCLASSEX);
+
+    /* Use default icon and mouse-pointer */
+    wincl.hIcon = LoadIcon (NULL, IDI_APPLICATION);
+    wincl.hIconSm = LoadIcon (NULL, IDI_APPLICATION);
+    wincl.hCursor = LoadCursor (NULL, IDC_ARROW);
+    wincl.lpszMenuName = "Moje_menu";                 /* No menu */
+    wincl.cbClsExtra = 0;                      /* No extra bytes after the window class */
+    wincl.cbWndExtra = 0;                      /* structure or the window instance */
+    /* Use Windows's default colour as the background of the window */
+    wincl.hbrBackground = (HBRUSH) (COLOR_WINDOW+1);
+
+    /* Register the window class, and if it fails quit the program */
+    if (!RegisterClassEx (&wincl))
+        return 0;
+
+    /* The class is registered, let's create the program*/
+    hwnd = CreateWindowEx (
+           0,                   /* Extended possibilites for variation */
+           szClassName,         /* Classname */
+           _T("Ruch jednostajnie przyspieszony po okrêgu"),       /* Title Text */
+           WS_OVERLAPPEDWINDOW, /* default window */
+           0,       /* Windows decides the position */
+           0,       /* where the window ends up on the screen */
+           800,                 /* The programs width */
+           700,                 /* and height in pixels */
+           HWND_DESKTOP,        /* The window is a child-window to desktop */
+           NULL,                /* No menu */
+           hThisInstance,       /* Program Instance handler */
+           NULL                 /* No Window Creation data */
+           );
+
+    hdcokno = GetDC( hwnd );
+    czarne_pioro = CreatePen( PS_SOLID, 1, RGB( 0, 0, 0 ) );
+    czarne_pioro = ( HPEN ) SelectObject( hdcokno, czarne_pioro );
+    czerwone_pioro = CreatePen( PS_SOLID, 1, RGB( 255, 0, 0 ) );
+
+    przycik_rysowania = CreateWindowEx( WS_EX_CLIENTEDGE, "BUTTON", "Rysuj", WS_VISIBLE | WS_CHILD | WS_BORDER, 90, 175, 75, 25, hwnd, ( HMENU ) 1, hThisInstance, NULL );
+
+    przycisk_stop = CreateWindowEx( WS_EX_CLIENTEDGE, "BUTTON", "Stop", WS_VISIBLE | WS_CHILD | WS_BORDER, 200, 175, 75, 25, hwnd, ( HMENU ) 2, hThisInstance, NULL );
+
+
+    //static_predkosc_poczatkowa = CreateWindowEx( WS_EX_CLIENTEDGE, "STATIC", "Predkosc poczatkowa: ", WS_CHILD | WS_VISIBLE, 15, 15, 150, 20, hwnd, NULL, hPrevInstance, NULL );
+
+
+
+    edit_predkosc_poczatkowa = CreateWindowEx( WS_EX_CLIENTEDGE, "EDIT", NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | ES_NUMBER, 170, 15, 150, 20, hwnd, ( HMENU ) 3, hPrevInstance, NULL );
+
+
+    //static_predkosc_koncowa = CreateWindowEx( WS_EX_CLIENTEDGE, "STATIC", "Predkosc koncowa: ", WS_CHILD | WS_VISIBLE, 15, 55, 150, 20, hwnd, NULL, hPrevInstance, NULL );
+
+    edit_predkosc_koncowa = CreateWindowEx( WS_EX_CLIENTEDGE, "EDIT", NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | ES_NUMBER, 170, 45, 150, 20, hwnd, NULL, hPrevInstance, NULL );
+
+
+    //static_promien_okregu = CreateWindowEx( WS_EX_CLIENTEDGE, "STATIC", "Promien okregu: ", WS_CHILD | WS_VISIBLE, 15, 95, 150, 20, hwnd, NULL, hPrevInstance, NULL );
+
+    edit_promien_okregu = CreateWindowEx( WS_EX_CLIENTEDGE, "EDIT", NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | ES_NUMBER, 170, 75, 150, 20, hwnd, NULL, hPrevInstance, NULL );
+
+
+    //static_czas_ruchu = CreateWindowEx( WS_EX_CLIENTEDGE, "STATIC", "Czas ruchu: ", WS_CHILD | WS_VISIBLE, 15, 135, 150, 20, hwnd, NULL, hPrevInstance, NULL );
+
+    edit_czas_ruchu = CreateWindowEx( WS_EX_CLIENTEDGE, "EDIT", NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | ES_NUMBER, 170, 105, 150, 20, hwnd, NULL, hPrevInstance, NULL );
+
+    //ramka = CreateWindowEx( WS_EX_CLIENTEDGE, "STATIC", "Czas ruchu: ", WS_CHILD | WS_VISIBLE | SS_BLACKFRAME, 25, 350, 150, 20, hwnd, NULL, hPrevInstance, NULL );
+
+    /* Make the window visible on the screen */
+    ShowWindow (hwnd, nCmdShow);
+
+    SendMessage( hwnd, WM_COMMAND, 6, 0 );
+
+    //      theard.terminate();
+
+    /* Run the message loop. It will run until GetMessage() returns 0 */
+    while (GetMessage (&messages, NULL, 0, 0) )
+    {
+        /* Translate virtual-key messages into character messages */
+        TranslateMessage(&messages);
+        /* Send message to WindowProcedure */
+        DispatchMessage(&messages);
+    }
+
+    /* The program return-value is 0 - The value that PostQuitMessage() gave */
+    return messages.wParam;
+}
+
+
+/*  This function is called by the Windows function DispatchMessage()  */
+
+LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    switch (message)                  /* handle the messages */
+    {
+    case WM_COMMAND:
+        if( wParam == 1 )
+        {
+            predkosc_poczatkowa = GetIntFromEdit( edit_predkosc_poczatkowa );
+            predkos_koncowa = GetIntFromEdit( edit_predkosc_koncowa );
+            promien_okregu = GetIntFromEdit( edit_promien_okregu );
+            czas_ruchu = GetIntFromEdit( edit_czas_ruchu );
+
+            if( predkos_koncowa < predkosc_poczatkowa )
+            {
+                MessageBox( hwnd, "Predkosc koncowa nie moze byc mniejsza od predkosci poczatkowej", "Blad", MB_OK | MB_ICONSTOP );
+                break;
+            }
+            if( predkos_koncowa == 0 )
+            {
+                MessageBox( hwnd, "Predkosc koncowa nie moze byc rowna 0", "Blad", MB_OK | MB_ICONSTOP );
+                break;
+            }
+            if( promien_okregu == 0 )
+            {
+                MessageBox( hwnd, "Promien okregu nie moze byc rowny 0", "Blad", MB_OK | MB_ICONSTOP );
+                break;
+            }
+            if( promien_okregu > 450 )
+            {
+                MessageBox( hwnd, "Promien okregu nie moze byc wieksza od 450", "Blad", MB_OK | MB_ICONSTOP );
+                break;
+            }
+            if( czas_ruchu == 0 )
+            {
+                MessageBox( hwnd, "Czas ruchu nie moze byc rowny 0", "Blad", MB_OK | MB_ICONSTOP );
+                break;
+            }
+
+            if( predkosc_poczatkowa >= 0 && predkos_koncowa > 0 && promien_okregu > 0 && czas_ruchu > 0 && predkos_koncowa > predkosc_poczatkowa )
+            {
+                if( !okno.isOpen() )
+                {
+                    przyspieszenie = ( predkos_koncowa - predkosc_poczatkowa ) / czas_ruchu;
+                    theard.launch();
+                }
+            }
+        }
+        if( wParam == 2 )
+        {
+            if( okno.isOpen() )
+            {
+                okno.close();
+                theard.terminate();
+            }
+        }
+        if( wParam == 5 )
+        {
+            SetPixel( hdcokno, 50 + zegar.getElapsedTime().asSeconds() * 20, 520 - predkosc * 20, RGB( 255, 0, 0 ) );
+        }
+        if( wParam == 6 )
+        {
+            /*TextOut( hdcokno,15, 15, "Predkosc poczatkowa: ", 20 );
+            TextOut( hdcokno,35, 45, "Predkosc koncowa: ", 17 );
+            TextOut( hdcokno,54, 75, "Promien okregu: ", 15 );
+            TextOut( hdcokno,84, 105, "Czas ruchu: ", 11 );
+
+            MoveToEx( hdcokno, 50, 220, &stary );
+            LineTo( hdcokno, 50, 520 );
+            LineTo( hdcokno, 350, 520 );
+
+            MoveToEx( hdcokno, 50, 220, &stary );
+            LineTo( hdcokno, 40, 240 );
+            MoveToEx( hdcokno, 50, 220, &stary );
+            LineTo( hdcokno, 60, 240 );
+
+            MoveToEx( hdcokno, 350, 520, &stary );
+            LineTo( hdcokno, 330, 510 );
+            MoveToEx( hdcokno, 350, 520, &stary );
+            LineTo( hdcokno, 330, 530 );
+
+            TextOut( hdcokno, 30, 220, "V", 1 );
+            TextOut( hdcokno, 330, 530, "t", 1 );
+            LPCSTR cos[ 13 ] = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13" };
+
+            for( int i = 0; i < 13; i++ )
+            {
+                MoveToEx( hdcokno, 70 + i * 20, 510, &stary );
+                LineTo( hdcokno, 70 + i * 20, 530 );
+                if( i < 9 )
+                    TextOut( hdcokno, 67 + i * 20, 530, cos[ i ], 1 );
+                else
+                    TextOut( hdcokno, 64 + i * 20, 530, cos[ i ], 2 );
+
+                MoveToEx( hdcokno, 40, 500 - i * 20, &stary );
+                LineTo( hdcokno, 60, 500 - i * 20 );
+
+                if( i < 9 )
+                    TextOut( hdcokno, 27, 492 - i * 20, cos[ i ], 1 );
+                else
+                    TextOut( hdcokno, 27, 492 - i * 20, cos[ i ], 2 );
+            }
+
+            MoveToEx( hdcokno, 400, 220, &stary );
+            LineTo( hdcokno, 400, 520 );
+            LineTo( hdcokno, 700, 520 );
+
+            MoveToEx( hdcokno, 400, 220, &stary );
+            LineTo( hdcokno, 390, 240 );
+            MoveToEx( hdcokno, 400, 220, &stary );
+            LineTo( hdcokno, 410, 240 );
+
+            MoveToEx( hdcokno, 700, 520, &stary );
+            LineTo( hdcokno, 680, 510 );
+            MoveToEx( hdcokno, 700, 520, &stary );
+            LineTo( hdcokno, 680, 530 );
+
+            for( int i = 0; i < 13; i++ )
+            {
+                MoveToEx( hdcokno, 420 + i * 20, 510, &stary );
+                LineTo( hdcokno, 420 + i * 20, 530 );
+                if( i < 9 )
+                    TextOut( hdcokno, 417 + i * 20, 530, cos[ i ], 1 );
+                else
+                    TextOut( hdcokno, 414 + i * 20, 530, cos[ i ], 2 );
+
+                MoveToEx( hdcokno, 390, 500 - i * 20, &stary );
+                LineTo( hdcokno, 410, 500 - i * 20 );
+                if( i < 9 )
+                    TextOut( hdcokno, 377, 492 - i * 20, cos[ i ], 1 );
+                else
+                    TextOut( hdcokno, 377, 492 - i * 20, cos[ i ], 2 );
+            } */
+        }
+        if( wParam == 100 )
+        {
+            SelectObject( hdcokno, pudelko );
+            DeleteObject( czarne_pioro );
+            ReleaseDC( hwnd, hdcokno );
+
+            okno.close();
+            theard.terminate();
+            PostQuitMessage (0);
+        }
+        break;
+
+    case WM_PAINT:
+        {
+            PAINTSTRUCT ps; // deklaracja struktury
+            HDC hdc = BeginPaint( hwnd, & ps );
+
+            czarne_pioro = ( HPEN ) SelectObject( hdcokno, czarne_pioro );
+
+            TextOut( hdcokno,15, 15, "Predkosc poczatkowa: ", 20 );
+            TextOut( hdcokno,35, 45, "Predkosc koncowa: ", 17 );
+            TextOut( hdcokno,54, 75, "Promien okregu: ", 15 );
+            TextOut( hdcokno,84, 105, "Czas ruchu: ", 11 );
+
+            MoveToEx( hdcokno, 50, 220, &stary );
+            LineTo( hdcokno, 50, 520 );
+            LineTo( hdcokno, 350, 520 );
+
+            MoveToEx( hdcokno, 50, 220, &stary );
+            LineTo( hdcokno, 40, 240 );
+            MoveToEx( hdcokno, 50, 220, &stary );
+            LineTo( hdcokno, 60, 240 );
+
+            MoveToEx( hdcokno, 350, 520, &stary );
+            LineTo( hdcokno, 330, 510 );
+            MoveToEx( hdcokno, 350, 520, &stary );
+            LineTo( hdcokno, 330, 530 );
+
+            TextOut( hdcokno, 30, 220, "V", 1 );
+            TextOut( hdcokno, 330, 530, "t", 1 );
+            LPCSTR cos[ 13 ] = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13" };
+
+            for( int i = 0; i < 13; i++ )
+            {
+                MoveToEx( hdcokno, 70 + i * 20, 510, &stary );
+                LineTo( hdcokno, 70 + i * 20, 530 );
+                if( i < 9 )
+                    TextOut( hdcokno, 67 + i * 20, 530, cos[ i ], 1 );
+                else
+                    TextOut( hdcokno, 64 + i * 20, 530, cos[ i ], 2 );
+
+                MoveToEx( hdcokno, 40, 500 - i * 20, &stary );
+                LineTo( hdcokno, 60, 500 - i * 20 );
+
+                if( i < 9 )
+                    TextOut( hdcokno, 27, 492 - i * 20, cos[ i ], 1 );
+                else
+                    TextOut( hdcokno, 27, 492 - i * 20, cos[ i ], 2 );
+            }
+
+            MoveToEx( hdcokno, 400, 220, &stary );
+            LineTo( hdcokno, 400, 520 );
+            LineTo( hdcokno, 700, 520 );
+
+            MoveToEx( hdcokno, 400, 220, &stary );
+            LineTo( hdcokno, 390, 240 );
+            MoveToEx( hdcokno, 400, 220, &stary );
+            LineTo( hdcokno, 410, 240 );
+
+            MoveToEx( hdcokno, 700, 520, &stary );
+            LineTo( hdcokno, 680, 510 );
+            MoveToEx( hdcokno, 700, 520, &stary );
+            LineTo( hdcokno, 680, 530 );
+
+            TextOut( hdcokno, 380, 220, "s", 1 );
+            TextOut( hdcokno, 690, 530, "t", 1 );
+
+            for( int i = 0; i < 13; i++ )
+            {
+                MoveToEx( hdcokno, 420 + i * 20, 510, &stary );
+                LineTo( hdcokno, 420 + i * 20, 530 );
+                if( i < 9 )
+                    TextOut( hdcokno, 417 + i * 20, 530, cos[ i ], 1 );
+                else
+                    TextOut( hdcokno, 414 + i * 20, 530, cos[ i ], 2 );
+
+                MoveToEx( hdcokno, 390, 500 - i * 20, &stary );
+                LineTo( hdcokno, 410, 500 - i * 20 );
+
+                if( i < 9 )
+                    TextOut( hdcokno, 377, 492 - i * 20, cos[ i ], 1 );
+                else
+                    TextOut( hdcokno, 377, 492 - i * 20, cos[ i ], 2 );
+            }
+
+            czerwone_pioro = ( HPEN ) SelectObject( hdcokno, czerwone_pioro );
+            MoveToEx( hdcokno, 50, 520, &stary );
+            LineTo( hdcokno, 50 + wykres1_x * 20, 520 - wykres1_y * 20 );
+            czarne_pioro = ( HPEN ) SelectObject( hdcokno, czarne_pioro );
+
+            EndPaint( hwnd, & ps ); // zwalniamy hdc
+        }
+        break;
+
+    case WM_DESTROY:
+            SelectObject( hdcokno, pudelko );
+            DeleteObject( czarne_pioro );
+            ReleaseDC( hwnd, hdcokno );
+
+            okno.close();
+            theard.terminate();
+            PostQuitMessage (0);       /* send a WM_QUIT to the message queue */
+            break;
+    default:                      /* for messages that we don't deal with */
+            return DefWindowProc (hwnd, message, wParam, lParam);
+    }
+
+    return 0;
+}
